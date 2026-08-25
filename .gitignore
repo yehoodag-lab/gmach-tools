@@ -1,0 +1,23 @@
+# סודות ותצורה מקומית
+.env
+.env.local
+.env.*.local
+
+# גיבוי מקומי של קוד השרת - לא נדרש ל-Vercel deploy
+edge-functions/
+sql/
+
+# מקורות עבודה
+equipment-list.docx
+*.docx
+
+# מערכות הפעלה
+.DS_Store
+Thumbs.db
+
+# עורכים
+.vscode/
+.idea/
+
+# תלויות (למקרה שנוסיף node_modules בעתיד)
+node_modules/
