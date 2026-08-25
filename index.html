@@ -1257,20 +1257,98 @@ function equipmentAvailabilityBadge(item){
 function equipmentCard(item, isAdminView){
   return `
   <div class="bg-white rounded-2xl border p-4 flex flex-col gap-2" style="border-color:var(--border)">
-    ${item.image_url
-      ? `<img src="${item.image_url}" class="w-full h-36 object-contain rounded-xl border" style="border-color:var(--border);background:var(--neutral-bg)" />`
-      : `<div class="w-full h-36 rounded-xl flex items-center justify-center text-gray-400 text-sm" style="background:var(--neutral-bg);border:1px solid var(--border)">אין תמונה</div>`}
-    <div class="flex items-start justify-between">
-      <h3 class="font-bold text-lg">${item.name}</h3>
-      ${equipmentAvailabilityBadge(item)}
+    <div data-detail="${item.id}" style="cursor:pointer" class="flex flex-col gap-2">
+      ${item.image_url
+        ? `<img src="${item.image_url}" class="w-full h-36 object-contain rounded-xl border" style="border-color:var(--border);background:var(--neutral-bg)" />`
+        : `<div class="w-full h-36 rounded-xl flex items-center justify-center text-gray-400 text-sm" style="background:var(--neutral-bg);border:1px solid var(--border)">אין תמונה</div>`}
+      <div class="flex items-start justify-between">
+        <h3 class="font-bold text-lg">${esc(item.name)}</h3>
+        ${equipmentAvailabilityBadge(item)}
+      </div>
+      <p class="text-sm text-gray-500">${esc(item.category || '')}</p>
+      <p class="text-sm text-gray-700">${esc(item.description || '')}</p>
     </div>
-    <p class="text-sm text-gray-500">${item.category || ''}</p>
-    <p class="text-sm text-gray-700">${item.description || ''}</p>
     <div class="flex gap-2 mt-2 flex-wrap">
       ${!isAdminView && item.status !== 'in_repair' && (item.available_quantity ?? item.quantity ?? 0) > 0 ? `<button class="btn-primary px-3 py-1.5 rounded-lg text-sm" data-request="${item.id}">בקש להשאיל</button>` : ''}
       ${!isAdminView ? `<button class="btn-outline px-3 py-1.5 rounded-lg text-sm" data-report="${item.id}">דווח על תקלה</button>` : ''}
     </div>
   </div>`;
+}
+
+function openLoanRequestModal(equipmentId){
+  const eq = state.equipment.find(e=>e.id === equipmentId);
+  const maxAvail = eq ? (eq.available_quantity ?? eq.quantity ?? 1) : 1;
+  showModal(`
+    <h3 class="text-xl font-bold mb-4">בקשת השאלה - ${esc(eq?.name || '')}</h3>
+    <p class="text-sm text-gray-500 mb-3">תקופת ההשאלה המקסימלית היא 3 ימים.</p>
+    <div class="space-y-3">
+      ${maxAvail > 1 ? `
+      <label class="text-sm font-semibold">כמות מבוקשת (זמינות: ${maxAvail})</label>
+      <input id="req-quantity" type="number" min="1" max="${maxAvail}" step="1" value="1" class="input" />` : ''}
+      <label class="text-sm font-semibold">מתאריך</label>
+      <input id="req-start" type="date" class="input" min="${todayStr()}" value="${todayStr()}" />
+      <label class="text-sm font-semibold">עד תאריך</label>
+      <input id="req-end" type="date" class="input" min="${todayStr()}" />
+      <button id="req-submit" class="btn-primary w-full py-2.5 rounded-lg font-bold mt-2">שלח בקשה</button>
+    </div>`, ()=>{
+    document.getElementById('req-submit').addEventListener('click', ()=>{
+      const start = document.getElementById('req-start').value;
+      const end = document.getElementById('req-end').value;
+      if(!start || !end){ toast('נא למלא תאריכים', true); return; }
+      let quantity = 1;
+      if(maxAvail > 1){
+        quantity = parseInt(document.getElementById('req-quantity').value, 10);
+        if(!Number.isFinite(quantity) || quantity < 1) quantity = 1;
+        if(quantity > maxAvail){ toast(`אפשר לבקש עד ${maxAvail} יחידות`, true); return; }
+      }
+      requestLoan(equipmentId, start, end, quantity);
+    });
+  });
+}
+
+function openReportIssueModal(equipmentId){
+  showModal(`
+    <h3 class="text-xl font-bold mb-4">דיווח על תקלה</h3>
+    <textarea id="report-desc" class="input" rows="4" placeholder="מה קרה עם הפריט?"></textarea>
+    <button id="report-submit" class="btn-primary w-full py-2.5 rounded-lg font-bold mt-3">שלח דיווח</button>`, ()=>{
+    document.getElementById('report-submit').addEventListener('click', ()=>{
+      const desc = document.getElementById('report-desc').value.trim();
+      if(!desc){ toast('נא לתאר את התקלה', true); return; }
+      reportIssue(equipmentId, desc);
+    });
+  });
+}
+
+function openEquipmentDetailModal(item){
+  const avail = item.available_quantity ?? item.quantity ?? 0;
+  const canRequest = item.status !== 'in_repair' && avail > 0;
+  showModal(`
+    <div class="flex flex-col gap-3">
+      ${item.image_url
+        ? `<img src="${item.image_url}" class="w-full object-contain rounded-xl border" style="border-color:var(--border);background:var(--neutral-bg);max-height:340px" />`
+        : `<div class="w-full h-64 rounded-xl flex items-center justify-center text-gray-400" style="background:var(--neutral-bg);border:1px solid var(--border)">אין תמונה</div>`}
+      <div class="flex items-start justify-between gap-2 flex-wrap">
+        <h3 class="text-2xl font-bold">${esc(item.name)}</h3>
+        ${equipmentAvailabilityBadge(item)}
+      </div>
+      ${item.category ? `<p class="text-sm text-gray-600">קטגוריה: <span class="font-semibold" style="color:var(--accent)">${esc(item.category)}</span></p>` : ''}
+      ${item.description ? `<div class="text-gray-700 leading-relaxed border-t pt-3" style="border-color:var(--border);white-space:pre-wrap">${esc(item.description)}</div>` : ''}
+      <div class="flex gap-2 mt-3 flex-wrap">
+        ${canRequest ? `<button class="btn-primary flex-1 py-2.5 rounded-lg font-bold" data-detail-request="${item.id}">בקש להשאיל</button>` : ''}
+        <button class="btn-outline flex-1 py-2.5 rounded-lg font-bold" data-detail-report="${item.id}">דווח על תקלה</button>
+      </div>
+    </div>`, ()=>{
+    document.querySelector('[data-detail-request]')?.addEventListener('click', (e)=>{
+      const id = e.currentTarget.dataset.detailRequest;
+      closeModal();
+      openLoanRequestModal(id);
+    });
+    document.querySelector('[data-detail-report]')?.addEventListener('click', (e)=>{
+      const id = e.currentTarget.dataset.detailReport;
+      closeModal();
+      openReportIssueModal(id);
+    });
+  });
 }
 function equipmentMatchesFilters(item, f){
   f = f || state.equipmentFilters;
@@ -1287,52 +1365,22 @@ function equipmentMatchesFilters(item, f){
   return true;
 }
 function attachEquipmentCardEvents(){
+  document.querySelectorAll('[data-detail]').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      const eq = state.equipment.find(e=>e.id === el.dataset.detail);
+      if(eq) openEquipmentDetailModal(eq);
+    });
+  });
   document.querySelectorAll('[data-request]').forEach(btn=>{
-    btn.addEventListener('click', ()=>{
-      const id = btn.dataset.request;
-      const eq = state.equipment.find(e=>e.id === id);
-      const maxAvail = eq ? (eq.available_quantity ?? eq.quantity ?? 1) : 1;
-      showModal(`
-        <h3 class="text-xl font-bold mb-4">בקשת השאלה - ${esc(eq?.name || '')}</h3>
-        <p class="text-sm text-gray-500 mb-3">תקופת ההשאלה המקסימלית היא 3 ימים.</p>
-        <div class="space-y-3">
-          ${maxAvail > 1 ? `
-          <label class="text-sm font-semibold">כמות מבוקשת (זמינות: ${maxAvail})</label>
-          <input id="req-quantity" type="number" min="1" max="${maxAvail}" step="1" value="1" class="input" />` : ''}
-          <label class="text-sm font-semibold">מתאריך</label>
-          <input id="req-start" type="date" class="input" min="${todayStr()}" value="${todayStr()}" />
-          <label class="text-sm font-semibold">עד תאריך</label>
-          <input id="req-end" type="date" class="input" min="${todayStr()}" />
-          <button id="req-submit" class="btn-primary w-full py-2.5 rounded-lg font-bold mt-2">שלח בקשה</button>
-        </div>`, ()=>{
-        document.getElementById('req-submit').addEventListener('click', ()=>{
-          const start = document.getElementById('req-start').value;
-          const end = document.getElementById('req-end').value;
-          if(!start || !end){ toast('נא למלא תאריכים', true); return; }
-          let quantity = 1;
-          if(maxAvail > 1){
-            quantity = parseInt(document.getElementById('req-quantity').value, 10);
-            if(!Number.isFinite(quantity) || quantity < 1) quantity = 1;
-            if(quantity > maxAvail){ toast(`אפשר לבקש עד ${maxAvail} יחידות`, true); return; }
-          }
-          requestLoan(id, start, end, quantity);
-        });
-      });
+    btn.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      openLoanRequestModal(btn.dataset.request);
     });
   });
   document.querySelectorAll('[data-report]').forEach(btn=>{
-    btn.addEventListener('click', ()=>{
-      const id = btn.dataset.report;
-      showModal(`
-        <h3 class="text-xl font-bold mb-4">דיווח על תקלה</h3>
-        <textarea id="report-desc" class="input" rows="4" placeholder="מה קרה עם הפריט?"></textarea>
-        <button id="report-submit" class="btn-primary w-full py-2.5 rounded-lg font-bold mt-3">שלח דיווח</button>`, ()=>{
-        document.getElementById('report-submit').addEventListener('click', ()=>{
-          const desc = document.getElementById('report-desc').value.trim();
-          if(!desc){ toast('נא לתאר את התקלה', true); return; }
-          reportIssue(id, desc);
-        });
-      });
+    btn.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      openReportIssueModal(btn.dataset.report);
     });
   });
 }
@@ -1450,16 +1498,25 @@ function renderAbout(){
   app.innerHTML = shellHeader() + `
     <div class="max-w-3xl mx-auto p-4">
       <div class="bg-white rounded-2xl border p-6" style="border-color:var(--border)">
-        <h2 class="text-2xl font-bold mb-3" style="color:var(--accent)">גמ"ח כלי עבודה לע"נ אלקנה הנדלר ז"ל</h2>
+        <h2 class="text-2xl font-bold mb-4 text-center" style="color:var(--accent)">גמ"ח כלי עבודה לע"נ אלקנה הנדלר ז"ל</h2>
+        <div class="flex justify-center mb-5">
+          <img src="pic.png" alt="אלקנה הנדלר ז&quot;ל" style="max-width:260px;width:100%;height:auto;" />
+        </div>
         <div class="text-gray-700 leading-relaxed space-y-3">
-          <p>ברוכים המצטרפים לקהל לקוחותינו 😉</p>
+          <p>גמ"ח כלי עבודה הוקם לזכרו ועילוי נשמתו של אלקנה הנדלר ז"ל.</p>
+          <p>אלקנה היה אברך בישיבת "רועה ישראל" ביצהר, נשוי ואב לבן ונלב"ע ביד' תמוז תשפ"ב.</p>
+          <p>לצד לימוד תורה ועבודת ה' אלקנה היה איש אכפתי ומסור לסובב אותו והחזיק גמ"ח רכב בו נעזרו אברכי הישיבה.</p>
+          <p>גמ"ח כלי עבודה הוקם לזכרו ועילוי נשמתו וכדי להמשיך להשפיע טוב ועזרה לזולת.</p>
+        </div>
+        <h3 class="text-xl font-bold mt-8 mb-3 pb-2 border-b" style="color:var(--accent);border-color:var(--border)">פרטים טכניים על הגמ"ח</h3>
+        <div class="text-gray-700 leading-relaxed space-y-3">
           <p>הגמ"ח נמצא במחסן שמתחת למדרגות בכניסה לחצר שלנו.</p>
           <p class="font-semibold pt-2" style="color:var(--ink)">כדי שנוכל להמשיך להפעיל את הגמ"ח בצורה הטובה ביותר אנא קראו:</p>
           <ul class="list-disc pr-6 space-y-2">
             <li>בעת השאלה יש לבצע רישום. אסור בשום אופן לשאול כלי ללא רישום, אפילו לזמן קצר.</li>
             <li>אם חלילה קורה נזק לציוד - נבקש לתקן/לשלם.</li>
             <li>כאשר מחזירים ציוד בבקשה להחזירו נקי ומסודר כפי שלקחתם וכן לסמן שהוחזר.</li>
-            <li>הגמ"ח פועל ללא תשלום אולם תרומות להרחבת הפעילות יתקבלו בברכה - <a href="https://links.payboxapp.com/65e6ACqQLUb" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:underline;font-weight:600">קישור לתרומה</a></li>
+            <li>הגמ"ח פועל ללא תשלום אולם תרומות להרחבת הפעילות יתקבלו בברכה - <a href="https://links.payboxapp.com/65e6ACqQLUb" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:underline;font-weight:600">קישור לתרומה</a>.</li>
             <li>את רשימת הציוד בגמ"ח ניתן לראות באתר.</li>
           </ul>
         </div>
@@ -2986,14 +3043,22 @@ async function render(){
     renderCompleteProfile();
     return;
   }
-  state.view = state.profile.role === 'admin' ? 'dashboard' : 'equipment';
+  // רק בפעם הראשונה שהמשתמש נכנס (או אם הוא במסך שאין לו הרשאה אליו) - אתחל את ה-view
+  const isAdmin = state.profile.role === 'admin';
+  const adminOnlyViews = ['dashboard','admin-equipment','admin-loans','admin-users','admin-reports','admin-suggestions','admin-settings'];
+  const viewInvalid = !state.view || (!isAdmin && adminOnlyViews.includes(state.view));
+  if(viewInvalid){
+    state.view = isAdmin ? 'dashboard' : 'equipment';
+  }
   maybeSendWelcomeEmail(state.profile);
   await refreshAndRender();
 }
 
-supabase.auth.onAuthStateChange((_event, session)=>{
+supabase.auth.onAuthStateChange((event, session)=>{
+  // התעלם מ-TOKEN_REFRESHED וכדומה שגורמים לרינדור מיותר וקופצים חזרה לדשבורד
+  if(event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') return;
   state.session = session;
-  if(!session){ state.profile = null; }
+  if(!session){ state.profile = null; state.view = null; }
   render();
 });
 
