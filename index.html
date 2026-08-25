@@ -197,8 +197,68 @@
   .dp-export:hover{ background:var(--accent-dark); }
   .dp-reset{ background:white; color:var(--ink); }
   .dp-reset:hover{ background:var(--neutral-bg); }
+  .dp-edit-toggle{
+    display:flex; align-items:center; gap:8px;
+    padding:10px 12px; background:var(--neutral-bg); border-radius:10px;
+    cursor:pointer; user-select:none; font-weight:700;
+  }
+  .dp-edit-toggle input{ margin:0; }
+  /* מצב עריכת אלמנטים - הדגשה בהובר */
+  body.edit-mode-active *:not(#design-panel):not(#design-panel *):not(#design-toggle):not(#element-inspector):not(#element-inspector *):hover{
+    outline:2px dashed #C25017 !important;
+    outline-offset:2px;
+    cursor:crosshair !important;
+  }
+  body.edit-mode-active .selected-element{
+    outline:3px solid #C25017 !important;
+    outline-offset:2px;
+  }
+  /* פאנל בחירת אלמנט */
+  #element-inspector{
+    position:fixed; top:24px; right:24px; z-index:210;
+    width:280px; max-height:88vh; overflow-y:auto;
+    background:white; border-radius:14px;
+    box-shadow:0 12px 36px rgba(0,0,0,0.22);
+    border:2px solid #C25017;
+    display:none;
+  }
+  #element-inspector.open{ display:block; }
+  .ei-header{
+    padding:12px 14px; background:#C25017; color:white;
+    border-radius:12px 12px 0 0;
+    display:flex; justify-content:space-between; align-items:center;
+  }
+  .ei-header h4{ margin:0; font-size:13px; font-weight:700; }
+  .ei-header button{ background:none; border:none; color:white; font-size:18px; cursor:pointer; padding:0 4px; }
+  .ei-info{
+    padding:10px 14px; background:#FFF7EE; border-bottom:1px solid var(--border);
+    font-size:11px; color:var(--ink); font-family:monospace;
+    word-break:break-all;
+  }
+  .ei-body{ padding:12px 14px; display:flex; flex-direction:column; gap:11px; }
+  .ei-group{ display:flex; flex-direction:column; gap:4px; }
+  .ei-group label{ font-size:11px; font-weight:600; color:var(--ink); }
+  .ei-group .val{ color:var(--accent); font-weight:700; }
+  .ei-group input[type="color"]{
+    width:100%; height:32px; border:1px solid var(--border); border-radius:6px; cursor:pointer; padding:2px;
+  }
+  .ei-group input[type="range"]{ width:100%; accent-color:var(--accent); }
+  .ei-group select{
+    padding:6px 8px; border:1px solid var(--border); border-radius:6px; font-size:12px;
+  }
+  .ei-footer{
+    padding:10px 14px; border-top:1px solid var(--border);
+    display:flex; gap:6px; flex-wrap:wrap;
+  }
+  .ei-footer button{
+    flex:1; min-width:80px; padding:7px; border-radius:6px; font-weight:700; font-size:11px;
+    cursor:pointer; border:1px solid var(--border); background:white;
+  }
+  .ei-footer button:hover{ background:var(--neutral-bg); }
+  .ei-hide{ background:#F0DAD3 !important; color:var(--red) !important; }
   @media (max-width: 640px){
     #design-panel{ width:calc(100vw - 32px); right:16px; left:16px; }
+    #element-inspector{ width:calc(100vw - 32px); right:16px; left:16px; }
   }
 </style>
 </head>
@@ -255,9 +315,81 @@
       <input type="range" data-css-var="--logo-img-size" data-unit="px" min="150" max="480" step="10" value="320" id="dp-img-slider" />
     </div>
   </div>
+  <div class="dp-body" style="padding-top:0">
+    <label class="dp-edit-toggle" title="לחץ כדי להפעיל בחירת אלמנטים - אחר כך תוכל ללחוץ על כל אלמנט באתר ולערוך אותו">
+      <input type="checkbox" id="dp-edit-mode-toggle" />
+      🎯 מצב עריכת אלמנטים
+    </label>
+    <p class="text-xs text-gray-500" style="margin-top:-6px">כשמופעל - לחיצה על כל אלמנט תפתח פאנל שליטה על הסגנון שלו.</p>
+  </div>
   <div class="dp-footer">
     <button class="dp-reset" id="dp-reset">↺ אפס</button>
     <button class="dp-export" id="dp-export">📋 העתק שינויים</button>
+  </div>
+</div>
+
+<!-- פאנל בחירת אלמנט (מופיע כשלוחצים על אלמנט במצב עריכה) -->
+<div id="element-inspector">
+  <div class="ei-header">
+    <h4 id="ei-title">אלמנט</h4>
+    <button id="ei-close" aria-label="סגור">✕</button>
+  </div>
+  <div class="ei-info" id="ei-info">—</div>
+  <div class="ei-body">
+    <div class="ei-group">
+      <label>רקע</label>
+      <input type="color" data-ei-prop="background-color" value="#ffffff" />
+    </div>
+    <div class="ei-group">
+      <label>צבע טקסט</label>
+      <input type="color" data-ei-prop="color" value="#000000" />
+    </div>
+    <div class="ei-group">
+      <label>גודל טקסט: <span class="val" id="ei-font-val">14</span>px</label>
+      <input type="range" data-ei-prop="font-size" data-unit="px" min="10" max="48" step="1" value="14" id="ei-font-slider" />
+    </div>
+    <div class="ei-group">
+      <label>מרווח פנימי (padding): <span class="val" id="ei-pad-val">10</span>px</label>
+      <input type="range" data-ei-prop="padding" data-unit="px" min="0" max="60" step="2" value="10" id="ei-pad-slider" />
+    </div>
+    <div class="ei-group">
+      <label>מרווח חיצוני (margin): <span class="val" id="ei-mar-val">0</span>px</label>
+      <input type="range" data-ei-prop="margin" data-unit="px" min="0" max="60" step="2" value="0" id="ei-mar-slider" />
+    </div>
+    <div class="ei-group">
+      <label>עיגול פינות: <span class="val" id="ei-rad-val">8</span>px</label>
+      <input type="range" data-ei-prop="border-radius" data-unit="px" min="0" max="60" step="2" value="8" id="ei-rad-slider" />
+    </div>
+    <div class="ei-group">
+      <label>עובי מסגרת: <span class="val" id="ei-brw-val">0</span>px</label>
+      <input type="range" data-ei-prop="border-width" data-unit="px" min="0" max="8" step="1" value="0" id="ei-brw-slider" />
+    </div>
+    <div class="ei-group">
+      <label>צבע מסגרת</label>
+      <input type="color" data-ei-prop="border-color" value="#DDD0BB" />
+    </div>
+    <div class="ei-group">
+      <label>יישור טקסט</label>
+      <select data-ei-prop="text-align">
+        <option value="right">ימין</option>
+        <option value="center">מרכז</option>
+        <option value="left">שמאל</option>
+      </select>
+    </div>
+    <div class="ei-group">
+      <label>עובי גופן</label>
+      <select data-ei-prop="font-weight">
+        <option value="400">רגיל (400)</option>
+        <option value="500">בינוני (500)</option>
+        <option value="600">מודגש (600)</option>
+        <option value="700">מודגש חזק (700)</option>
+        <option value="800">שחור (800)</option>
+      </select>
+    </div>
+  </div>
+  <div class="ei-footer">
+    <button class="ei-hide" id="ei-hide">🚫 הסתר</button>
+    <button id="ei-clear">↺ אפס</button>
   </div>
 </div>
 
@@ -3291,37 +3423,53 @@ function setupDesignPanel(){
     });
   });
 
-  // איפוס
+  // איפוס (כולל סגנונות אלמנטים)
   resetBtn.addEventListener('click', ()=>{
-    if(!confirm('לאפס את כל השינויים לברירת המחדל?')) return;
+    if(!confirm('לאפס את כל השינויים (כולל סגנונות אלמנטים ספציפיים) לברירת המחדל?')) return;
     localStorage.removeItem(DESIGN_STORAGE_KEY);
-    for(const [k,v] of Object.entries(DESIGN_DEFAULTS)){
+    localStorage.removeItem(ELEMENT_STYLES_KEY);
+    for(const k of Object.keys(DESIGN_DEFAULTS)){
       document.documentElement.style.removeProperty(k);
     }
     applyAllDesignOverrides();
+    injectElementStyles();
     toast('הוחזר לברירת המחדל');
   });
 
   // ייצוא - העתקה ללוח + toast עם הוראות
   exportBtn.addEventListener('click', async ()=>{
     const overrides = loadDesignOverrides();
-    if(Object.keys(overrides).length === 0){
+    const elementStyles = loadElementStyles();
+    const hasOverrides = Object.keys(overrides).length > 0;
+    const hasElementStyles = Object.keys(elementStyles).length > 0;
+    if(!hasOverrides && !hasElementStyles){
       toast('אין שינויים לייצא', true); return;
     }
-    let cssText = ':root {\n';
-    for(const [k,v] of Object.entries(overrides)){
-      cssText += `  ${k}: ${v};\n`;
+    let cssText = '';
+    if(hasOverrides){
+      cssText += ':root {\n';
+      for(const [k,v] of Object.entries(overrides)){
+        cssText += `  ${k}: ${v};\n`;
+      }
+      cssText += '}\n\n';
     }
-    cssText += '}\n';
+    if(hasElementStyles){
+      for(const [selector, props] of Object.entries(elementStyles)){
+        cssText += `${selector} {\n`;
+        for(const [k,v] of Object.entries(props)){
+          cssText += `  ${k}: ${v} !important;\n`;
+        }
+        cssText += '}\n\n';
+      }
+    }
     try{
       await navigator.clipboard.writeText(cssText);
       toast('הועתק! שלח את הטקסט בצ\'אט כדי לשמור לצמיתות');
     }catch(e){
-      // אם הדפדפן חוסם - הצג במודל להעתקה ידנית
       showModal(`
         <h3 class="text-xl font-bold mb-3">השינויים שלך ב-CSS</h3>
         <p class="text-sm text-gray-500 mb-3">העתק את הטקסט הבא ושלח בצ'אט:</p>
-        <textarea class="input" rows="10" readonly style="font-family:monospace;font-size:12px">${esc(cssText)}</textarea>
+        <textarea class="input" rows="14" readonly style="font-family:monospace;font-size:12px;direction:ltr">${esc(cssText)}</textarea>
       `);
     }
   });
@@ -3340,6 +3488,184 @@ function updateDesignPanelVisibility(){
 
 // אתחול חד-פעמי של הפאנל (event listeners)
 setupDesignPanel();
+
+// ============================================================
+// מצב עריכת אלמנטים - פאנל בחירה ופרסיסטנציה
+// ============================================================
+const ELEMENT_STYLES_KEY = 'gmach_element_styles_v1';
+let elementStylesStyleTag = null;
+let currentSelectedElement = null;
+let currentSelectedSelector = null;
+
+function loadElementStyles(){
+  try{ return JSON.parse(localStorage.getItem(ELEMENT_STYLES_KEY) || '{}'); }
+  catch(e){ return {}; }
+}
+function saveElementStyles(obj){
+  try{ localStorage.setItem(ELEMENT_STYLES_KEY, JSON.stringify(obj)); }catch(e){}
+}
+function injectElementStyles(){
+  if(!elementStylesStyleTag){
+    elementStylesStyleTag = document.createElement('style');
+    elementStylesStyleTag.id = 'user-element-styles';
+    document.head.appendChild(elementStylesStyleTag);
+  }
+  const styles = loadElementStyles();
+  let css = '';
+  for(const [selector, props] of Object.entries(styles)){
+    const rules = Object.entries(props).map(([k,v])=>`${k}: ${v} !important;`).join(' ');
+    css += `${selector} { ${rules} }\n`;
+  }
+  elementStylesStyleTag.textContent = css;
+}
+
+// יוצר סלקטור יציב לאלמנט על סמך המחלקות שלו (עדיפות למחלקה ראשונה שאינה tailwind נפוצה)
+function getStableSelector(el){
+  if(el.id) return '#' + el.id;
+  const classes = Array.from(el.classList).filter(c=>{
+    // סינון מחלקות של Tailwind דינמיות (מרווחים, גדלים, גריד) שיכולות להיות רבות
+    return !/^(flex|grid|hidden|block|inline|w-|h-|p-|m-|px-|py-|mx-|my-|pt-|pb-|pl-|pr-|mt-|mb-|ml-|mr-|gap-|space-|text-|font-|leading-|tracking-|justify-|items-|self-|order-|absolute|relative|fixed|sticky|static|top-|bottom-|left-|right-|inset-|z-|opacity-|shadow|rounded|border-|bg-|min-|max-|overflow|cursor-|select-|whitespace-|break-|truncate|list-|placeholder-|antialiased|group|peer|sm:|md:|lg:|xl:)/.test(c);
+  });
+  if(classes.length){
+    return '.' + classes.join('.');
+  }
+  // fallback - path selector
+  return el.tagName.toLowerCase();
+}
+
+function readableElementInfo(el){
+  const tag = el.tagName.toLowerCase();
+  const classes = Array.from(el.classList).slice(0,3).join('.');
+  const txt = (el.textContent||'').trim().slice(0,40);
+  return `<${tag}>${classes ? '.'+classes : ''}${txt ? ' — "'+txt+'"' : ''}`;
+}
+
+function selectElementForEdit(el){
+  // ניקוי בחירה קודמת
+  if(currentSelectedElement){
+    currentSelectedElement.classList.remove('selected-element');
+  }
+  currentSelectedElement = el;
+  currentSelectedSelector = getStableSelector(el);
+  el.classList.add('selected-element');
+
+  // פתיחת הפאנל ועדכון הערכים לפי הסגנון הנוכחי של האלמנט
+  const inspector = document.getElementById('element-inspector');
+  document.getElementById('ei-title').textContent = 'עריכת ' + (el.tagName.toLowerCase());
+  document.getElementById('ei-info').textContent = currentSelectedSelector + '   |   ' + readableElementInfo(el);
+  inspector.classList.add('open');
+
+  const styles = window.getComputedStyle(el);
+  // עדכון הבקרים לפי הערכים הנוכחיים
+  document.querySelectorAll('#element-inspector [data-ei-prop]').forEach(input=>{
+    const prop = input.dataset.eiProp;
+    let val = styles.getPropertyValue(prop);
+    if(input.type === 'range'){
+      const px = parseFloat(val) || 0;
+      input.value = Math.round(px);
+    } else if(input.type === 'color'){
+      // המרת rgb ל-hex
+      const m = val.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+      if(m){
+        const hex = '#' + [m[1],m[2],m[3]].map(n=>parseInt(n).toString(16).padStart(2,'0')).join('');
+        input.value = hex;
+      }
+    } else if(input.tagName === 'SELECT'){
+      input.value = val.trim();
+    }
+  });
+  // עדכון תוויות
+  updateInspectorLabels();
+}
+
+function updateInspectorLabels(){
+  const map = { 'ei-font-slider':'ei-font-val', 'ei-pad-slider':'ei-pad-val', 'ei-mar-slider':'ei-mar-val', 'ei-rad-slider':'ei-rad-val', 'ei-brw-slider':'ei-brw-val' };
+  for(const [s,v] of Object.entries(map)){
+    const sl = document.getElementById(s), vl = document.getElementById(v);
+    if(sl && vl) vl.textContent = sl.value;
+  }
+}
+
+function applyElementStyle(prop, value){
+  if(!currentSelectedSelector) return;
+  const styles = loadElementStyles();
+  if(!styles[currentSelectedSelector]) styles[currentSelectedSelector] = {};
+  styles[currentSelectedSelector][prop] = value;
+  saveElementStyles(styles);
+  injectElementStyles();
+}
+
+function clearElementStyles(){
+  if(!currentSelectedSelector) return;
+  const styles = loadElementStyles();
+  delete styles[currentSelectedSelector];
+  saveElementStyles(styles);
+  injectElementStyles();
+  toast('הסגנון של האלמנט אופס');
+  deselectElement();
+}
+
+function hideCurrentElement(){
+  if(!currentSelectedSelector) return;
+  applyElementStyle('display', 'none');
+  toast('האלמנט הוסתר. לביטול - כפתור אפס');
+  deselectElement();
+}
+
+function deselectElement(){
+  if(currentSelectedElement){
+    currentSelectedElement.classList.remove('selected-element');
+    currentSelectedElement = null;
+    currentSelectedSelector = null;
+  }
+  document.getElementById('element-inspector').classList.remove('open');
+}
+
+function setupElementInspector(){
+  const inspector = document.getElementById('element-inspector');
+  const toggle = document.getElementById('dp-edit-mode-toggle');
+  if(!inspector || !toggle) return;
+
+  // הפעלת/כיבוי מצב עריכה
+  toggle.addEventListener('change', ()=>{
+    document.body.classList.toggle('edit-mode-active', toggle.checked);
+    if(!toggle.checked) deselectElement();
+  });
+
+  // תפיסת קליק גלובלית - אם במצב עריכה, לבחור אלמנט במקום להריץ את הקליק
+  document.addEventListener('click', (e)=>{
+    if(!document.body.classList.contains('edit-mode-active')) return;
+    // התעלמות מלחיצות בתוך הפאנלים עצמם
+    if(e.target.closest('#design-panel') || e.target.closest('#design-toggle') || e.target.closest('#element-inspector')) return;
+    e.preventDefault();
+    e.stopPropagation();
+    selectElementForEdit(e.target);
+  }, true);
+
+  // כפתורי הפאנל
+  document.getElementById('ei-close').addEventListener('click', deselectElement);
+  document.getElementById('ei-hide').addEventListener('click', hideCurrentElement);
+  document.getElementById('ei-clear').addEventListener('click', clearElementStyles);
+
+  // בקרים - עדכון סגנון בזמן אמת
+  document.querySelectorAll('#element-inspector [data-ei-prop]').forEach(input=>{
+    const prop = input.dataset.eiProp;
+    const unit = input.dataset.unit || '';
+    const eventName = (input.type === 'color' || input.tagName === 'SELECT') ? 'input' : 'input';
+    input.addEventListener(eventName, ()=>{
+      const val = input.value + unit;
+      applyElementStyle(prop, val);
+      // אם משנים עובי מסגרת - הוסף גם border-style
+      if(prop === 'border-width' && parseInt(input.value,10) > 0){
+        applyElementStyle('border-style', 'solid');
+      }
+      updateInspectorLabels();
+    });
+  });
+
+  injectElementStyles();
+}
+setupElementInspector();
 async function render(){
   const { data: { session } } = await supabase.auth.getSession();
   state.session = session;
