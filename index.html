@@ -59,6 +59,36 @@
   .nav-tab{ padding:8px 14px; border-radius:9999px; cursor:pointer; font-weight:600; }
   .nav-tab.active{ background:var(--ink); color:white; }
   .nav-tab:not(.active):hover{ background:var(--neutral-bg); }
+  .cat-pill{
+    padding:8px 16px;
+    border-radius:9999px;
+    cursor:pointer;
+    font-weight:600;
+    font-size:14px;
+    background:white;
+    border:1.5px solid var(--border);
+    color:var(--ink);
+    transition:all 0.15s ease;
+    user-select:none;
+  }
+  .cat-pill:hover{ background:var(--neutral-bg); border-color:var(--accent); }
+  .cat-pill.active{ background:var(--accent); color:white; border-color:var(--accent); }
+  .smart-search-box{
+    background:linear-gradient(135deg, #FFF7EE 0%, #FCEFDD 100%);
+    border:1.5px solid var(--accent);
+    border-radius:14px;
+    padding:14px 18px;
+    box-shadow:0 2px 8px rgba(194,80,23,0.08);
+  }
+  .smart-search-box input{
+    border:1px solid var(--border);
+    background:white;
+    border-radius:10px;
+    padding:10px 14px;
+    width:100%;
+    font-size:15px;
+  }
+  .smart-search-box input:focus{ outline:none; border-color:var(--accent); box-shadow:0 0 0 3px rgba(194,80,23,0.15); }
 </style>
 </head>
 <body>
@@ -110,6 +140,129 @@ const state = {
 };
 
 const app = document.getElementById('app');
+
+// ============================================================
+// חיפוש חכם - מילון שמות עממיים לכלי עבודה
+// terms = ביטויים שהמשתמש עשוי להקליד; match = חלקים בשם הפריט להתאמה
+// ============================================================
+const TOOL_ALIASES = [
+  { terms: ['ג\'קסו','גקסו','גיקסו','גקסור','ג\'יגסו','ג\'ק סו','מסור אנכי','jigsaw'], match: ['ג\'קסו'] },
+  { terms: ['סקיל','skil','מסור עגול','circularsaw','circular saw','דיסק עץ'], match: ['סקיל','מסור עגול'] },
+  { terms: ['מברגה','בירגה','ברגה','drill','screwdriver','דריל'], match: ['מברגה'] },
+  { terms: ['פטישון','פטיש חשמלי','חוצב','שפצל','rotaryhammer','rotary hammer','המר'], match: ['פטישון'] },
+  { terms: ['מקדחה','קידוח','drill press','שולחני'], match: ['מקדחה'] },
+  { terms: ['משחזת','גרינדר','גרנדר','angle grinder','anglegrinder','flex','פלקס','דיסק ברזל','דיסק חיתוך'], match: ['משחזת'] },
+  { terms: ['פליירים','פלייר','צבת','צבתות','plyers','pliers','פטנט'], match: ['פליירים','צבתות','פטנט'] },
+  { terms: ['שפכטל','שפכטלים','putty knife','puttyknife'], match: ['שפכטל'] },
+  { terms: ['רולר','רולרים','roller'], match: ['רולר'] },
+  { terms: ['מזמרה','מזמרות','גיזום','גיזומים','שיחים','shears','pruner'], match: ['מזמר','שיחים','גיזום'] },
+  { terms: ['סולם','סולמות','ladder'], match: ['סולם'] },
+  { terms: ['מכסחה','מכסחת דשא','דשא','lawnmower','lawn mower'], match: ['מכסחת','דשא'] },
+  { terms: ['ריתוך','רתכת','welder','welding'], match: ['ריתוך','רתכ'] },
+  { terms: ['מלחם','לחם','soldering','soldering iron'], match: ['מלחם'] },
+  { terms: ['מפוח','עלים','blower','leaf blower','leafblower'], match: ['מפוח'] },
+  { terms: ['קומפרסור','compressor','אוויר דחוס'], match: ['קומפרסור'] },
+  { terms: ['רולטקה','סרט מדידה','מטר','tape measure','tapemeasure'], match: ['רולטקה'] },
+  { terms: ['פלס','level','לייזר פלס'], match: ['פלס'] },
+  { terms: ['לייזר','laser','מד מרחק','מד לייזר'], match: ['לייזר'] },
+  { terms: ['שלייף','ליטוש','ליטש','sander','שיוף','שיפים'], match: ['שלייף'] },
+  { terms: ['אקדח מסמרים','nailer','nail gun','nailgun','סיכות אוויר'], match: ['אקדח מסמרים'] },
+  { terms: ['מפתח צינורות','מפתח סוודי','pipe wrench','pipewrench'], match: ['מפתח צינורות'] },
+  { terms: ['מפתח פתוח','wrench','open wrench'], match: ['מפתח פתוח'] },
+  { terms: ['אלן','אלנים','allen','hex key','hexkey','משושה'], match: ['אלן'] },
+  { terms: ['ברקוד','barcode'], match: ['ברקוד'] },
+  { terms: ['לום','crowbar','pry bar','prybar','חילוץ'], match: ['לום'] },
+  { terms: ['סיליקון','silicone','אקדח סיליקון'], match: ['סיליקון'] },
+  { terms: ['בטריה','סוללה','battery','נטענת','נטען'], match: ['בטריה','נטענ'] },
+  { terms: ['מסור חרב','חרב','reciprocating','reciprocating saw','sawzall'], match: ['מסור חרב'] },
+  { terms: ['רוטר','router','נגרות'], match: ['רוטר'] },
+  { terms: ['גרונג','miter','miter saw','mitersaw','chop saw','chopsaw'], match: ['גרונג'] },
+  { terms: ['מולטיטול','multitool','multi tool'], match: ['מולטיטול'] },
+  { terms: ['דרמל','dremel','rotary tool','rotarytool','מיני מברגה'], match: ['דרמל'] },
+  { terms: ['קסדה','helmet','hardhat','hard hat','כובע'], match: ['קסדה'] },
+  { terms: ['כפפה','כפפות','gloves'], match: ['כפפ'] },
+  { terms: ['משקפי מגן','safety glasses','safetyglasses','goggles','משקפיים'], match: ['משקפי'] },
+  { terms: ['פטיש','hammer'], match: ['פטיש'] },
+  { terms: ['את חפירה','את','shovel','spade','חפירה'], match: ['את חפירה'] },
+  { terms: ['טוריה','קלשון','hoe','fork'], match: ['טוריה'] },
+  { terms: ['מכוש','pickaxe','pick axe','מכתש'], match: ['מכוש'] },
+  { terms: ['גרזן','axe','ax'], match: ['גרזן'] },
+  { terms: ['חרמש','trimmer','string trimmer','stringtrimmer','ווקר','weeder'], match: ['חרמש'] },
+  { terms: ['מלחציים','מלחצת','clamp','clamps','vise','vice'], match: ['מלחצ'] },
+  { terms: ['מספרי פח','מספריים','scissors','shears','tin snips','tinsnips'], match: ['מספר'] },
+  { terms: ['מפסלת','chisel','wood chisel','woodchisel'], match: ['מפסלת'] },
+  { terms: ['שופין','שופינים','file','files','rasp'], match: ['שופינ'] },
+  { terms: ['מרצע','awl'], match: ['מרצע'] },
+  { terms: ['פומפה','plunger','שירותים'], match: ['פומפה'] },
+  { terms: ['קפיץ','שחרור סתימות','snake','drain snake','drainsnake'], match: ['קפיץ','סתימות'] },
+  { terms: ['ג\'ק','ג\'ק מכני','jack','car jack'], match: ['ג\'ק'] },
+  { terms: ['בוסטר','בוסטר הנעה','jump starter','jumpstarter','jumper'], match: ['בוסטר'] },
+  { terms: ['פרוז\'קטור','פרוזקטור','זרקור','projector','floodlight','flood light'], match: ['פרוז'] },
+  { terms: ['בוקסה','בוקסות','socket','sockets','socket set','socketset'], match: ['בוקס'] },
+  { terms: ['רב מודד','מולטימטר','multimeter','טסטר'], match: ['רב מודד','מולטי','טסטר'] },
+  { terms: ['קליבר','caliper','vernier'], match: ['קליבר'] },
+  { terms: ['מחוגה','compass','divider'], match: ['מחוגה'] },
+  { terms: ['אנך','פיון','plumb bob','plumbbob'], match: ['אנך','פיון'] },
+  { terms: ['רתמה','רתמת בטיחות','harness','safety harness','safetyharness'], match: ['רתמה','רתמת'] },
+  { terms: ['מגן אוזניים','אטמי אוזניים','ear protection','earmuffs','ear muffs'], match: ['מגן אוזני'] },
+  { terms: ['תוכי','חיתוך ברזל','rebar cutter','rebarcutter'], match: ['תוכי'] },
+  { terms: ['אקדח ניטים','rivet','rivet gun','rivetgun','ניט'], match: ['ניט'] },
+  { terms: ['חותך זכוכית','glass cutter','glasscutter'], match: ['זכוכית'] },
+  { terms: ['גבס','drywall'], match: ['גבס'] },
+  { terms: ['קרמיקה','ceramic','tile','tile cutter','tilecutter'], match: ['קרמיקה'] },
+  { terms: ['פיסטולט','spray gun','spraygun','pistolet'], match: ['פיסטולט'] },
+  { terms: ['כבל','כבלים','extension cord','extensioncord','מאריך'], match: ['כבל'] },
+  { terms: ['מברשת','brush','wire brush','wirebrush'], match: ['מברשת'] },
+  { terms: ['רטצ\'אט','רצ\'ט','ratchet'], match: ['רטצ'] },
+  { terms: ['מלכודת','מלכודת עכברים','mouse trap','mousetrap','trap'], match: ['מלכודת'] },
+  { terms: ['אקדח סיכה','grease','grease gun','greasegun','גריז'], match: ['אקדח סיכה'] },
+  { terms: ['ממיר מתח','inverter','ממיר','12v to 220v'], match: ['ממיר'] },
+  { terms: ['מגפיים','ליציקה','boots','rubber boots','rubberboots'], match: ['מגפי'] },
+  { terms: ['חמור','חמורים','חמורי עבודה','sawhorse','saw horse','stand'], match: ['חמור'] },
+  { terms: ['זז-קל','WD-40','wd40','חומר סיכה','שחרור ברגים'], match: ['זז-קל'] },
+  { terms: ['מגנט','ניצבי גבס','stud finder','studfinder','magnet'], match: ['מגנט'] },
+  { terms: ['פלר','צנרת מיזוג','flare','flare tool','flaretool'], match: ['פלר'] },
+  { terms: ['הלמניה','delamin','delamination'], match: ['הלמניה'] },
+  { terms: ['ברנר','burner','torch'], match: ['ברנר'] },
+  { terms: ['בטון','מסמרים לבטון','concrete','concrete nail','concretenail'], match: ['בטון'] },
+  { terms: ['משפך','funnel'], match: ['משפך'] },
+  { terms: ['גז','בלון גז','gas','propane'], match: ['גז'] },
+];
+
+// הסרת ניקוד, סימני פיסוק ורווחים, המרה לאותיות קטנות - לצורך השוואה
+function normalizeText(text){
+  if(!text) return '';
+  return String(text)
+    .toLowerCase()
+    .replace(/[֑-ׇ]/g,'')     // ניקוד
+    .replace(/["'`׳״.,\-()\/\\\s]+/g,'') // סימני פיסוק ורווחים
+    .trim();
+}
+
+// מחשב ציון התאמה של פריט לשאילתה. 0 = לא מתאים.
+function smartSearchScore(query, item){
+  const qn = normalizeText(query);
+  if(!qn) return 1; // אין חיפוש → הכל מתאים
+  const nameNorm = normalizeText(item.name);
+  const descNorm = normalizeText(item.description);
+  const catNorm = normalizeText(item.category);
+  let score = 0;
+  if(nameNorm.includes(qn)) score += 10;
+  else if(descNorm.includes(qn)) score += 5;
+  else if(catNorm.includes(qn)) score += 3;
+  // בדיקת כינויים - האם השאילתה תואמת אחד הכינויים במילון,
+  // ואז האם שם הפריט מכיל את אחד הביטויים המזוהים
+  for(const {terms, match} of TOOL_ALIASES){
+    const queryHitsAlias = terms.some(t => qn.includes(normalizeText(t)));
+    if(!queryHitsAlias) continue;
+    for(const m of match){
+      const mn = normalizeText(m);
+      if(nameNorm.includes(mn)) score += 8;
+      else if(descNorm.includes(mn)) score += 4;
+    }
+  }
+  return score;
+}
 
 // ============================================================
 // עזרים כלליים
@@ -1074,7 +1227,7 @@ function shellHeader(){
   <div class="bg-white border-b" style="border-color:var(--border)">
     <div class="max-w-6xl mx-auto px-4 py-4 flex flex-wrap items-center justify-between gap-3">
       <div>
-        <img src="${LOGO_HEADER_SRC}" alt="גמ&quot;ח כלי עבודה" style="height:144px;width:auto;" />
+        <img src="${LOGO_HEADER_SRC}" alt="גמ&quot;ח כלי עבודה" style="height:180px;width:auto;" />
         <p class="text-xs text-gray-500">שלום ${state.profile?.full_name || ''} · ${isAdmin ? 'מנהל' : 'מנוי'}</p>
       </div>
       <div class="flex flex-wrap gap-2">
@@ -1122,9 +1275,7 @@ function equipmentCard(item, isAdminView){
 function equipmentMatchesFilters(item, f){
   f = f || state.equipmentFilters;
   if(f.search){
-    const s = f.search.toLowerCase();
-    const haystack = `${item.name || ''} ${item.category || ''} ${item.description || ''}`.toLowerCase();
-    if(!haystack.includes(s)) return false;
+    if(smartSearchScore(f.search, item) === 0) return false;
   }
   if(f.category && item.category !== f.category) return false;
   if(f.status){
@@ -1186,18 +1337,23 @@ function attachEquipmentCardEvents(){
   });
 }
 function renderMemberEquipment(){
+  const activeCat = state.equipmentFilters.category || '';
   app.innerHTML = shellHeader() + `
     <div class="max-w-6xl mx-auto p-4">
       <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
         <h2 class="text-xl font-bold">רשימת הציוד</h2>
         <button id="suggest-equipment-btn" class="btn-outline px-4 py-2 rounded-lg text-sm font-bold">הצע ציוד חדש</button>
       </div>
+      <div class="smart-search-box mb-4">
+        <label class="text-sm font-bold mb-2 block" style="color:var(--accent)">🔍 חיפוש חכם - תכתוב איך שאתה מכיר את הכלי</label>
+        <input id="eq-search" type="search" placeholder="לדוגמה: מסור אנכי / ג'קסו / פלייר / מברגה נטענת..." value="${esc(state.equipmentFilters.search)}" />
+        <p class="text-xs text-gray-500 mt-1.5">מזהה שמות עממיים, טעויות כתיב וקיצורים</p>
+      </div>
       <div class="flex flex-wrap gap-2 mb-4">
-        <input id="eq-search" placeholder="חיפוש חופשי..." class="input flex-1" style="min-width:200px" value="${state.equipmentFilters.search}" />
-        <select id="eq-filter-category" class="input" style="max-width:220px">
-          <option value="">כל הקטגוריות</option>
-          ${state.categories.map(c=>`<option value="${c.name}" ${state.equipmentFilters.category===c.name?'selected':''}>${esc(c.name)}</option>`).join('')}
-        </select>
+        <div class="cat-pill ${!activeCat?'active':''}" data-cat="">כל הכלים</div>
+        ${state.categories.map(c=>`<div class="cat-pill ${activeCat===c.name?'active':''}" data-cat="${esc(c.name)}">${esc(c.name)}</div>`).join('')}
+      </div>
+      <div class="flex justify-end mb-4">
         <select id="eq-filter-status" class="input" style="max-width:180px">
           <option value="">כל הסטטוסים</option>
           <option value="available" ${state.equipmentFilters.status==='available'?'selected':''}>זמין</option>
@@ -1236,8 +1392,15 @@ function renderMemberEquipment(){
   }
   renderGrid();
   document.getElementById('eq-search').addEventListener('input', (e)=>{ state.equipmentFilters.search = e.target.value; renderGrid(); });
-  document.getElementById('eq-filter-category').addEventListener('change', (e)=>{ state.equipmentFilters.category = e.target.value; renderGrid(); });
   document.getElementById('eq-filter-status').addEventListener('change', (e)=>{ state.equipmentFilters.status = e.target.value; renderGrid(); });
+  document.querySelectorAll('.cat-pill').forEach(pill=>{
+    pill.addEventListener('click', ()=>{
+      state.equipmentFilters.category = pill.dataset.cat;
+      document.querySelectorAll('.cat-pill').forEach(p=>p.classList.remove('active'));
+      pill.classList.add('active');
+      renderGrid();
+    });
+  });
 }
 function renderMemberLoans(){
   app.innerHTML = shellHeader() + `
@@ -1838,6 +2001,7 @@ function openMarkReturnedModal(equipmentId){
   });
 }
 function renderAdminEquipment(){
+  const activeCat = state.adminEquipmentFilters.category || '';
   app.innerHTML = shellHeader() + `
     <div class="max-w-6xl mx-auto p-4">
       <div class="flex items-center justify-between mb-4">
@@ -1847,12 +2011,15 @@ function renderAdminEquipment(){
           <button id="add-equip-btn" class="btn-primary px-4 py-2 rounded-lg text-sm font-bold">+ הוסף פריט</button>
         </div>
       </div>
+      <div class="smart-search-box mb-4">
+        <label class="text-sm font-bold mb-2 block" style="color:var(--accent)">🔍 חיפוש חכם</label>
+        <input id="admin-eq-search" type="search" placeholder="מזהה שמות עממיים וקיצורים..." value="${esc(state.adminEquipmentFilters.search)}" />
+      </div>
       <div class="flex flex-wrap gap-2 mb-4">
-        <input id="admin-eq-search" placeholder="חיפוש חופשי..." class="input flex-1" style="min-width:200px" value="${state.adminEquipmentFilters.search}" />
-        <select id="admin-eq-filter-category" class="input" style="max-width:220px">
-          <option value="">כל הקטגוריות</option>
-          ${state.categories.map(c=>`<option value="${c.name}" ${state.adminEquipmentFilters.category===c.name?'selected':''}>${esc(c.name)}</option>`).join('')}
-        </select>
+        <div class="cat-pill ${!activeCat?'active':''}" data-admin-cat="">כל הכלים</div>
+        ${state.categories.map(c=>`<div class="cat-pill ${activeCat===c.name?'active':''}" data-admin-cat="${esc(c.name)}">${esc(c.name)}</div>`).join('')}
+      </div>
+      <div class="flex justify-end mb-4">
         <select id="admin-eq-filter-status" class="input" style="max-width:180px">
           <option value="">כל הסטטוסים</option>
           <option value="available" ${state.adminEquipmentFilters.status==='available'?'selected':''}>זמין</option>
@@ -1882,8 +2049,15 @@ function renderAdminEquipment(){
   }
   renderGrid();
   document.getElementById('admin-eq-search').addEventListener('input', (e)=>{ state.adminEquipmentFilters.search = e.target.value; renderGrid(); });
-  document.getElementById('admin-eq-filter-category').addEventListener('change', (e)=>{ state.adminEquipmentFilters.category = e.target.value; renderGrid(); });
   document.getElementById('admin-eq-filter-status').addEventListener('change', (e)=>{ state.adminEquipmentFilters.status = e.target.value; renderGrid(); });
+  document.querySelectorAll('[data-admin-cat]').forEach(pill=>{
+    pill.addEventListener('click', ()=>{
+      state.adminEquipmentFilters.category = pill.dataset.adminCat;
+      document.querySelectorAll('[data-admin-cat]').forEach(p=>p.classList.remove('active'));
+      pill.classList.add('active');
+      renderGrid();
+    });
+  });
 
   function openForm(item){
     showModal(equipmentFormHtml(item), ()=>{
