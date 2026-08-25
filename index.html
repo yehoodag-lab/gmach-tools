@@ -107,6 +107,7 @@
     display:flex; align-items:center; justify-content:center;
     z-index:10;
     border:1px solid var(--border);
+    overflow:hidden;
   }
   .logo-circle-img{ height:var(--logo-img-size); width:auto; }
   .header-logo-spacer{ height:calc(var(--logo-circle-size) / 2 + 30px); }
@@ -898,7 +899,70 @@ async function updateMyProfile(fullName, phone){
 // ============================================================
 // פעולות - מנהל: ציוד
 // ============================================================
+// דחיסת תמונה לגודל יעד (ברירת מחדל 200KB) - שומר על יחס הגובה-רוחב, מקטין ממדים אם צריך.
+// אם הקובץ כבר קטן מהיעד - מחזיר אותו כמו שהוא.
+async function compressImageToTarget(file, targetBytes = 200 * 1024, maxDim = 1400){
+  if(!file.type.startsWith('image/')) return file;
+  if(file.size <= targetBytes) return file;
+  const dataUrl = await new Promise((res, rej)=>{
+    const r = new FileReader();
+    r.onload = ()=>res(r.result);
+    r.onerror = rej;
+    r.readAsDataURL(file);
+  });
+  const img = await new Promise((res, rej)=>{
+    const im = new Image();
+    im.onload = ()=>res(im);
+    im.onerror = rej;
+    im.src = dataUrl;
+  });
+  let w = img.width, h = img.height;
+  if(w > maxDim || h > maxDim){
+    if(w > h){ h = Math.round(h * maxDim / w); w = maxDim; }
+    else { w = Math.round(w * maxDim / h); h = maxDim; }
+  }
+  const canvas = document.createElement('canvas');
+  canvas.width = w; canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  // רקע לבן כדי לא לקבל שקיפות שחורה על תמונות PNG כשמומרים ל-JPEG
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(0, 0, w, h);
+  ctx.drawImage(img, 0, 0, w, h);
+  // ניסיון עם ירידה הדרגתית באיכות עד היעד
+  let quality = 0.88;
+  let blob = null;
+  for(let i = 0; i < 8; i++){
+    blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', quality));
+    if(!blob) break;
+    if(blob.size <= targetBytes) break;
+    quality -= 0.1;
+    if(quality < 0.4) break;
+  }
+  // אם עדיין גדול - מקטין את הממדים ונסיון נוסף
+  if(blob && blob.size > targetBytes && (w > 700 || h > 700)){
+    const s = 0.75;
+    w = Math.round(w * s); h = Math.round(h * s);
+    canvas.width = w; canvas.height = h;
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(0, 0, w, h);
+    ctx.drawImage(img, 0, 0, w, h);
+    blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', 0.8));
+  }
+  if(!blob) return file;
+  const newName = file.name.replace(/\.[^.]+$/, '') + '.jpg';
+  return new File([blob], newName, { type: 'image/jpeg', lastModified: Date.now() });
+}
+
 async function uploadEquipmentImage(file){
+  // ניסיון לדחוס אם הקובץ מעל 200KB
+  try{
+    const originalSize = file.size;
+    file = await compressImageToTarget(file, 200 * 1024);
+    if(file.size < originalSize){
+      const savedKb = Math.round((originalSize - file.size) / 1024);
+      console.log(`Image compressed: saved ${savedKb}KB (from ${Math.round(originalSize/1024)}KB to ${Math.round(file.size/1024)}KB)`);
+    }
+  }catch(e){ console.warn('image compression failed, uploading original', e); }
   const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
   const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
   const { data, error } = await supabase.storage.from('equipment-images').upload(path, file, { cacheControl: '3600', upsert: false });
@@ -1612,8 +1676,8 @@ function equipmentCard(item, isAdminView){
   <div class="bg-white rounded-2xl border p-4 flex flex-col gap-2" style="border-color:var(--border)">
     <div data-detail="${item.id}" style="cursor:pointer" class="flex flex-col gap-2">
       ${item.image_url
-        ? `<img src="${item.image_url}" class="w-full h-36 object-contain rounded-xl border" style="border-color:var(--border);background:var(--neutral-bg)" />`
-        : `<div class="w-full h-36 rounded-xl flex items-center justify-center text-gray-400 text-sm" style="background:var(--neutral-bg);border:1px solid var(--border)">אין תמונה</div>`}
+        ? `<img src="${item.image_url}" class="w-full h-36 object-contain rounded-xl border" style="border-color:var(--border);background:#FFFFFF" />`
+        : `<div class="w-full h-36 rounded-xl flex items-center justify-center text-gray-400 text-sm" style="background:#FFFFFF;border:1px solid var(--border)">אין תמונה</div>`}
       <div class="flex items-start justify-between">
         <h3 class="font-bold text-lg">${esc(item.name)}</h3>
         ${equipmentAvailabilityBadge(item)}
@@ -1678,8 +1742,8 @@ function openEquipmentDetailModal(item){
   showModal(`
     <div class="flex flex-col gap-3">
       ${item.image_url
-        ? `<img src="${item.image_url}" class="w-full object-contain rounded-xl border" style="border-color:var(--border);background:var(--neutral-bg);max-height:340px" />`
-        : `<div class="w-full h-64 rounded-xl flex items-center justify-center text-gray-400" style="background:var(--neutral-bg);border:1px solid var(--border)">אין תמונה</div>`}
+        ? `<img src="${item.image_url}" class="w-full object-contain rounded-xl border" style="border-color:var(--border);background:#FFFFFF;max-height:340px" />`
+        : `<div class="w-full h-64 rounded-xl flex items-center justify-center text-gray-400" style="background:#FFFFFF;border:1px solid var(--border)">אין תמונה</div>`}
       <div class="flex items-start justify-between gap-2 flex-wrap">
         <h3 class="text-2xl font-bold">${esc(item.name)}</h3>
         ${equipmentAvailabilityBadge(item)}
@@ -2164,7 +2228,7 @@ function equipmentFormHtml(item){
       <textarea id="eq-desc" placeholder="תיאור" class="input" rows="2">${esc(item?.description || '')}</textarea>
       <div>
         <label class="text-sm text-gray-500 block mb-1">תמונת הפריט</label>
-        <div id="eq-image-preview" class="mb-2">${item?.image_url ? `<img src="${item.image_url}" class="w-28 h-28 object-contain rounded-lg border" style="border-color:var(--border);background:var(--neutral-bg)" />` : ''}</div>
+        <div id="eq-image-preview" class="mb-2">${item?.image_url ? `<img src="${item.image_url}" class="w-28 h-28 object-contain rounded-lg border" style="border-color:var(--border);background:#FFFFFF" />` : ''}</div>
         <input id="eq-image-file" type="file" accept="image/*" class="input" />
         <input id="eq-image-url" placeholder="או הדבק קישור לתמונה" class="input mt-2" value="${item?.image_url || ''}" />
       </div>
@@ -2202,8 +2266,8 @@ function adminEquipmentCard(e){
   return `
     <div class="bg-white rounded-2xl border p-4 flex flex-col gap-2" style="border-color:var(--border)">
       ${e.image_url
-        ? `<img src="${e.image_url}" class="w-full h-32 object-contain rounded-xl border" style="border-color:var(--border);background:var(--neutral-bg)" />`
-        : `<div class="w-full h-32 rounded-xl flex items-center justify-center text-gray-400 text-sm" style="background:var(--neutral-bg);border:1px solid var(--border)">אין תמונה</div>`}
+        ? `<img src="${e.image_url}" class="w-full h-32 object-contain rounded-xl border" style="border-color:var(--border);background:#FFFFFF" />`
+        : `<div class="w-full h-32 rounded-xl flex items-center justify-center text-gray-400 text-sm" style="background:#FFFFFF;border:1px solid var(--border)">אין תמונה</div>`}
       <div class="flex items-start justify-between">
         <h3 class="font-bold text-lg">${esc(e.name)}</h3>
         ${equipmentAvailabilityBadge(e)}
@@ -2498,7 +2562,7 @@ function renderAdminEquipment(){
         const f = e.target.files[0];
         if(!f) return;
         const url = URL.createObjectURL(f);
-        document.getElementById('eq-image-preview').innerHTML = `<img src="${url}" class="w-28 h-28 object-contain rounded-lg border" style="border-color:var(--border);background:var(--neutral-bg)" />`;
+        document.getElementById('eq-image-preview').innerHTML = `<img src="${url}" class="w-28 h-28 object-contain rounded-lg border" style="border-color:var(--border);background:#FFFFFF" />`;
       });
       document.getElementById('eq-save').addEventListener('click', async ()=>{
         const saveBtn = document.getElementById('eq-save');
@@ -2767,7 +2831,7 @@ async function renderTrailer(){
       <h2 class="text-xl font-bold mb-4">פריט מיוחד</h2>
       ${specialItems.length === 0 ? '<p class="text-gray-500">עדיין לא הוגדר פריט מיוחד (עגלה) במערכת. פנה למנהל.</p>' : specialItems.map(e=>`
         <div class="bg-white rounded-2xl border p-4 mb-4" style="border-color:var(--border)">
-          ${e.image_url ? `<img src="${e.image_url}" class="w-full h-48 object-contain rounded-xl border mb-3" style="border-color:var(--border);background:var(--neutral-bg)" />` : ''}
+          ${e.image_url ? `<img src="${e.image_url}" class="w-full h-48 object-contain rounded-xl border mb-3" style="border-color:var(--border);background:#FFFFFF" />` : ''}
           <h3 class="font-bold text-lg mb-1">${esc(e.name)}</h3>
           <p class="text-sm text-gray-600 mb-2">${esc(e.description || '')}</p>
           <p class="text-sm text-gray-500 mb-3">מחיר: ${e.price_local ?? 50} ₪ ליום בתוך היישוב · ${e.price_outside ?? 100} ₪ ליום מחוץ ליישוב</p>
@@ -3167,7 +3231,7 @@ function openAddFromSuggestionModal(suggestion){
       const f = e.target.files[0];
       if(!f) return;
       const url = URL.createObjectURL(f);
-      document.getElementById('eq-image-preview').innerHTML = `<img src="${url}" class="w-28 h-28 object-contain rounded-lg border" style="border-color:var(--border);background:var(--neutral-bg)" />`;
+      document.getElementById('eq-image-preview').innerHTML = `<img src="${url}" class="w-28 h-28 object-contain rounded-lg border" style="border-color:var(--border);background:#FFFFFF" />`;
     });
     document.getElementById('eq-save').addEventListener('click', async ()=>{
       const saveBtn = document.getElementById('eq-save');
