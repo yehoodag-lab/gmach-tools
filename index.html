@@ -98,8 +98,7 @@
   .logo-circle-wrapper{
     position:absolute;
     bottom:calc(var(--logo-circle-size) / -2);
-    left:50%;
-    transform:translateX(-50%);
+    right:32px;
     width:var(--logo-circle-size);
     height:var(--logo-circle-size);
     border-radius:50%;
@@ -111,6 +110,14 @@
   }
   .logo-circle-img{ height:var(--logo-img-size); width:auto; }
   .header-logo-spacer{ height:calc(var(--logo-circle-size) / 2 + 30px); }
+  /* לתת מקום ללוגו הצף בימין */
+  .app-header .header-inner{
+    padding-right: calc(var(--logo-circle-size) + 50px);
+  }
+  .header-tabs-row{ justify-content:flex-end; }
+  @media (max-width: 900px){
+    .app-header .header-inner{ padding-right: calc(var(--logo-circle-size) + 30px); }
+  }
   .btn-wa{
     background:#25D366; color:white; padding:8px 14px; border-radius:8px; font-weight:700;
     display:inline-flex; align-items:center; gap:6px; text-decoration:none;
@@ -144,8 +151,10 @@
   .cat-card.active .cat-card-img{ background:rgba(255,255,255,0.9); }
   .cat-card-label{ font-weight:700; font-size:14px; }
   @media (max-width: 640px){
-    :root{ --logo-circle-size:220px; --logo-img-size:190px; }
+    :root{ --logo-circle-size:180px; --logo-img-size:160px; }
     .header-logo-spacer{ height:calc(var(--logo-circle-size) / 2 + 20px); }
+    .logo-circle-wrapper{ right:12px; }
+    .app-header .header-inner{ padding-right: calc(var(--logo-circle-size) + 20px); }
     .cat-cards-grid{ grid-template-columns:repeat(auto-fill, minmax(110px, 1fr)); gap:8px; }
     .cat-card-img{ width:60px; height:60px; }
     .cat-card-label{ font-size:13px; }
@@ -204,7 +213,7 @@
   }
   .dp-edit-toggle input{ margin:0; }
   /* מצב עריכת אלמנטים - הדגשה בהובר */
-  body.edit-mode-active *:not(#design-panel):not(#design-panel *):not(#design-toggle):not(#element-inspector):not(#element-inspector *):hover{
+  body.edit-mode-active *:not(#design-panel):not(#design-panel *):not(#design-toggle):not(#element-inspector):not(#element-inspector *):not(#edit-mode-banner):not(#edit-mode-banner *):hover{
     outline:2px dashed #C25017 !important;
     outline-offset:2px;
     cursor:crosshair !important;
@@ -212,6 +221,21 @@
   body.edit-mode-active .selected-element{
     outline:3px solid #C25017 !important;
     outline-offset:2px;
+  }
+  #edit-mode-banner{
+    position:fixed; top:0; left:0; right:0; z-index:300;
+    background:#C25017; color:white;
+    padding:10px 16px; text-align:center;
+    font-weight:700; font-size:14px;
+    box-shadow:0 2px 12px rgba(0,0,0,0.15);
+    display:none; align-items:center; justify-content:center; gap:12px;
+  }
+  body.edit-mode-active #edit-mode-banner{ display:flex; }
+  body.edit-mode-active{ padding-top:44px; }
+  #edit-mode-banner button{
+    background:white; color:#C25017; border:none;
+    padding:5px 12px; border-radius:6px; font-weight:700; cursor:pointer;
+    font-size:12px;
   }
   /* פאנל בחירת אלמנט */
   #element-inspector{
@@ -274,6 +298,12 @@
   <svg width="30" height="30" viewBox="0 0 32 32" fill="white"><path d="M16.001 3C9.373 3 4 8.373 4 15.001c0 2.386.688 4.612 1.877 6.492L4 29l7.685-1.847A11.94 11.94 0 0 0 16.001 27C22.63 27 28 21.63 28 15.001 28 8.373 22.63 3 16.001 3zm6.978 17.146c-.297.836-1.47 1.53-2.404 1.73-.638.137-1.47.246-4.27-.916-3.584-1.484-5.89-5.09-6.07-5.327-.178-.237-1.449-1.928-1.449-3.68 0-1.75.9-2.61 1.222-2.968.297-.33.65-.412.867-.412.216 0 .433.002.622.011.2.01.468-.076.732.559.297.72.99 2.487 1.077 2.667.089.178.148.386.03.62-.117.237-.176.386-.35.593-.178.208-.372.463-.53.622-.178.178-.363.372-.156.727.207.356.918 1.516 1.97 2.455 1.354 1.209 2.494 1.583 2.85 1.762.356.178.563.148.771-.09.207-.237.888-1.034 1.125-1.39.237-.356.474-.297.8-.178.326.118 2.075.978 2.43 1.157.356.178.593.267.681.416.089.148.089.858-.208 1.694z"/></svg>
 </a>
 
+<!-- באנר מצב עריכת אלמנטים - מופיע רק כשמצב עריכה פעיל -->
+<div id="edit-mode-banner">
+  <span>🎯 מצב עריכת אלמנטים פעיל - כל הקליקים נחסמים ובוחרים אלמנטים לעריכה</span>
+  <button id="edit-mode-banner-off">כבה עריכה (ESC)</button>
+</div>
+
 <!-- פאנל עיצוב חי - נראה רק לאדמין -->
 <button id="design-toggle" title="פתח פאנל עיצוב" aria-label="פתח פאנל עיצוב">🎨</button>
 <div id="design-panel" role="dialog" aria-label="פאנל עיצוב">
@@ -320,7 +350,8 @@
       <input type="checkbox" id="dp-edit-mode-toggle" />
       🎯 מצב עריכת אלמנטים
     </label>
-    <p class="text-xs text-gray-500" style="margin-top:-6px">כשמופעל - לחיצה על כל אלמנט תפתח פאנל שליטה על הסגנון שלו.</p>
+    <p class="text-xs text-gray-500" style="margin-top:-6px">כשמופעל - לחיצה על כל אלמנט תפתח פאנל שליטה. ESC לכיבוי מהיר.</p>
+    <button id="dp-reset-elements" class="btn-outline" style="padding:8px;border-radius:8px;font-weight:600;font-size:12px;margin-top:6px">🗑 מחק את כל סגנונות האלמנטים בלבד</button>
   </div>
   <div class="dp-footer">
     <button class="dp-reset" id="dp-reset">↺ אפס</button>
@@ -1538,7 +1569,7 @@ function shellHeader(){
   const waIconSvg = `<svg viewBox="0 0 32 32" fill="currentColor"><path d="M16.001 3C9.373 3 4 8.373 4 15.001c0 2.386.688 4.612 1.877 6.492L4 29l7.685-1.847A11.94 11.94 0 0 0 16.001 27C22.63 27 28 21.63 28 15.001 28 8.373 22.63 3 16.001 3zm6.978 17.146c-.297.836-1.47 1.53-2.404 1.73-.638.137-1.47.246-4.27-.916-3.584-1.484-5.89-5.09-6.07-5.327-.178-.237-1.449-1.928-1.449-3.68 0-1.75.9-2.61 1.222-2.968.297-.33.65-.412.867-.412.216 0 .433.002.622.011.2.01.468-.076.732.559.297.72.99 2.487 1.077 2.667.089.178.148.386.03.62-.117.237-.176.386-.35.593-.178.208-.372.463-.53.622-.178.178-.363.372-.156.727.207.356.918 1.516 1.97 2.455 1.354 1.209 2.494 1.583 2.85 1.762.356.178.563.148.771-.09.207-.237.888-1.034 1.125-1.39.237-.356.474-.297.8-.178.326.118 2.075.978 2.43 1.157.356.178.593.267.681.416.089.148.089.858-.208 1.694z"/></svg>`;
   return `
   <div class="app-header">
-    <div class="max-w-6xl mx-auto px-4 py-4">
+    <div class="max-w-6xl mx-auto px-4 py-4 header-inner">
       <div class="header-top-row">
         <p class="text-sm text-gray-600">שלום ${esc(state.profile?.full_name || '')} · ${isAdmin ? 'מנהל' : 'מנוי'}</p>
         <div class="flex gap-2 items-center flex-wrap">
@@ -3474,6 +3505,14 @@ function setupDesignPanel(){
     }
   });
 
+  // כפתור: איפוס סגנונות אלמנטים בלבד (בלי לגעת בצבעים ובלוגו)
+  document.getElementById('dp-reset-elements')?.addEventListener('click', ()=>{
+    if(!confirm('למחוק את כל הסגנונות הספציפיים שהחלת על אלמנטים? (הצבעים והלוגו יישארו)')) return;
+    localStorage.removeItem(ELEMENT_STYLES_KEY);
+    injectElementStyles();
+    toast('סגנונות האלמנטים נמחקו');
+  });
+
   applyAllDesignOverrides();
 }
 
@@ -3627,9 +3666,21 @@ function setupElementInspector(){
   if(!inspector || !toggle) return;
 
   // הפעלת/כיבוי מצב עריכה
-  toggle.addEventListener('change', ()=>{
-    document.body.classList.toggle('edit-mode-active', toggle.checked);
-    if(!toggle.checked) deselectElement();
+  const setEditMode = (on)=>{
+    toggle.checked = on;
+    document.body.classList.toggle('edit-mode-active', on);
+    if(!on) deselectElement();
+  };
+  toggle.addEventListener('change', ()=>setEditMode(toggle.checked));
+
+  // כפתור באנר לכיבוי
+  document.getElementById('edit-mode-banner-off')?.addEventListener('click', ()=>setEditMode(false));
+
+  // ESC מכבה מצב עריכה
+  document.addEventListener('keydown', (e)=>{
+    if(e.key === 'Escape' && document.body.classList.contains('edit-mode-active')){
+      setEditMode(false);
+    }
   });
 
   // תפיסת קליק גלובלית - אם במצב עריכה, לבחור אלמנט במקום להריץ את הקליק
